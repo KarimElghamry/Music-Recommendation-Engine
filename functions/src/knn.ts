@@ -21,7 +21,9 @@ export function knn(songs: Song[], userSong: Song): Song[] {
       Math.pow(song.instrumentalness - userSong.instrumentalness, 2) +
       Math.pow(song.liveness - userSong.liveness, 2) +
       Math.pow(song.speechiness - userSong.speechiness, 2) +
-      Math.pow(song.valence - userSong.valence, 2);
+      Math.pow(song.valence - userSong.valence, 2) +
+      Math.pow(song.tempo - userSong.tempo, 2) +
+      Math.pow(song.loudness - userSong.loudness, 2);
     const pair: Pair = {
       song: song,
       distance: distance
