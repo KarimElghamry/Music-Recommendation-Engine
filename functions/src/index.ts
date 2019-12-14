@@ -10,32 +10,49 @@ import * as os from "os";
 admin.initializeApp();
 const db = admin.firestore();
 
-export const getRecommendations = functions.https.onRequest(
-  async (req, res) => {
-    const userId: string = req.body.uid;
+export const getRecommendations = functions.https.onCall(
+  async (data, context) => {
+    const userId: string | undefined = context.auth?.uid;
+    console.log(`user uid: ${context.auth?.uid}`);
+    if (!userId) throw Error(`Invalid authentication`)
+
     const userDoc: FirebaseFirestore.DocumentSnapshot = await db
       .collection("users")
       .doc(userId)
       .get();
+
     const userData: FirebaseFirestore.DocumentData | undefined = userDoc.data();
     if (!userData) {
-      console.log("error");
-      return;
+      throw Error(`No data for user: ${userId}`);
     }
 
+    const avgUserSong: any = userData.averageScore;
+
     const userSong: Song = {
-      acousticness: userData.acousticness,
-      danceability: userData.danceability,
-      popularity: userData.popularity,
-      valence: userData.valence,
-      energy: userData.energy,
-      liveness: userData.liveness,
-      speechiness: userData.speechiness,
-      timeStamp: userData.timeStamp,
-      instrumentalness: userData.instrumentalness,
-      loudness: userData.loudness,
-      tempo: userData.tempo
+      acousticness: avgUserSong.acousticness,
+      danceability: avgUserSong.danceability,
+      popularity: avgUserSong.popularity,
+      valence: avgUserSong.valence,
+      energy: avgUserSong.energy,
+      liveness: avgUserSong.liveness,
+      speechiness: avgUserSong.speechiness,
+      timeStamp: avgUserSong.timeStamp,
+      instrumentalness: avgUserSong.instrumentalness,
+      loudness: avgUserSong.loudness,
+      tempo: avgUserSong.tempo
     };
+
+    console.log(`User avg: acousticness: ${userData.acousticness},
+    danceability: ${userData.danceability},
+    popularity: ${userData.popularity},
+    valence: ${userData.valence},
+    energy: ${userData.energy},
+    liveness: ${userData.liveness},
+    speechiness: ${userData.speechiness},
+    timeStamp: ${userData.timeStamp},
+    instrumentalness: ${userData.instrumentalness},
+    loudness: ${userData.loudness},
+    tempo: ${userData.tempo}`);
 
     const storage = admin.storage();
     const bucket = storage.bucket("gs://road-trax.appspot.com");
@@ -79,10 +96,10 @@ export const getRecommendations = functions.https.onRequest(
       songs.push(song);
     }
 
-    let output: Song[] = knn(songs, userSong);
+    const response: Song[] = knn(songs, userSong);
 
-    console.log(output);
+    console.log(response);
 
-    res.send(output);
+    return Promise.resolve({ body: response });
   }
 );
