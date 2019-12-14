@@ -1,20 +1,20 @@
 export interface Song {
-  artist?: string;
-  name?: string;
-  genre?: string;
-  uid?: string;
+  artist?: String;
+  name?: String;
+  genre?: String;
+  uid?: String;
   popularity: number;
   acousticness: number;
   danceability: number;
   duration?: number;
   energy: number;
   instrumentalness: number;
-  key?: string;
+  key?: String;
   liveness: number;
   loudness: number;
-  mode?: string;
+  mode?: String;
   speechiness: number;
   tempo: number;
-  timeStamp?: string;
+  timeStamp?: String;
   valence: number;
 }

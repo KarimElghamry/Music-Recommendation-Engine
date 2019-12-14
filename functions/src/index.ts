@@ -1,94 +1,88 @@
 import * as functions from "firebase-functions";
+import * as admin from "firebase-admin";
 import * as Papa from "papaparse";
-import axios, { AxiosResponse } from "axios";
+import * as fs from "fs";
 import { Song } from "../src/models";
 import { knn } from "./knn";
+import * as path from "path";
+import * as os from "os";
 
-export const getRecommendations = functions.https.onCall(
-  async (data, context) => {
-    if (!context.auth) return;
+admin.initializeApp();
+const db = admin.firestore();
 
-    let userId: String = context.auth.uid;
-    let url: string =
-      "https://firebasestorage.googleapis.com/v0/b/road-trax.appspot.com/o/spotify.csv?alt=media&token=d2c11883-2495-46df-a719-d47dcbfaae80";
+export const getRecommendations = functions.https.onRequest(
+  async (req, res) => {
+    const userId: string = req.body.uid;
+    const userDoc: FirebaseFirestore.DocumentSnapshot = await db
+      .collection("users")
+      .doc(userId)
+      .get();
+    const userData: FirebaseFirestore.DocumentData | undefined = userDoc.data();
+    if (!userData) {
+      console.log("error");
+      return;
+    }
 
-    let response: AxiosResponse = await axios.get(url);
-    let results: Papa.ParseResult = Papa.parse(response.data);
+    const userSong: Song = {
+      acousticness: userData.acousticness,
+      danceability: userData.danceability,
+      popularity: userData.popularity,
+      valence: userData.valence,
+      energy: userData.energy,
+      liveness: userData.liveness,
+      speechiness: userData.speechiness,
+      timeStamp: userData.timeStamp,
+      instrumentalness: userData.instrumentalness,
+      loudness: userData.loudness,
+      tempo: userData.tempo
+    };
+
+    const storage = admin.storage();
+    const bucket = storage.bucket("gs://road-trax.appspot.com");
+    const tempFilePath = path.join(os.tmpdir(), "spotifyFeatures3.csv");
+    await bucket
+      .file("spotifyFeatures3.csv")
+      .download({ destination: tempFilePath });
+    console.log("Downloaded to: " + tempFilePath);
+
+    let results = Papa.parse(fs.readFileSync(tempFilePath, "utf8"));
+    console.log(results.data.slice(1, 10));
+
     let songsRaw = results.data.slice(1);
     let features: String[] = results.data[0];
 
     const songs: Song[] = [];
-    songsRaw.forEach(songData => {
+    for (let i: number = 0; i < songsRaw.length; i++) {
+      let songData: String[] = songsRaw[i];
       const song: Song = {
         genre: songData[features.indexOf("genre")],
         artist: songData[features.indexOf("artist_name")],
         name: songData[features.indexOf("track_name")],
         uid: songData[features.indexOf("track_id")],
-        popularity: songData[features.indexOf("popularity")],
-        acousticness: songData[features.indexOf("acousticness")],
-        danceability: songData[features.indexOf("danceability")],
-        duration: songData[features.indexOf("duration_ms")],
-        energy: songData[features.indexOf("energy")],
-        instrumentalness: songData[features.indexOf("instrumentalness")],
+        popularity: Number(songData[features.indexOf("popularity")]),
+        acousticness: Number(songData[features.indexOf("acousticness")]),
+        danceability: Number(songData[features.indexOf("danceability")]),
+        duration: Number(songData[features.indexOf("duration_ms")]),
+        energy: Number(songData[features.indexOf("energy")]),
+        instrumentalness: Number(
+          songData[features.indexOf("instrumentalness")]
+        ),
         key: songData[features.indexOf("key")],
-        liveness: songData[features.indexOf("liveness")],
-        loudness: songData[features.indexOf("loudness")],
+        liveness: Number(songData[features.indexOf("liveness")]),
+        loudness: Number(songData[features.indexOf("loudness")]),
         mode: songData[features.indexOf("mode")],
-        speechiness: songData[features.indexOf("speechiness")],
-        tempo: songData[features.indexOf("tempo")],
+        speechiness: Number(songData[features.indexOf("speechiness")]),
+        tempo: Number(songData[features.indexOf("tempo")]),
         timeStamp: songData[features.indexOf("time_signature")],
-        valence: songData[features.indexOf("valence")]
+        valence: Number(songData[features.indexOf("valence")])
       } as Song;
       songs.push(song);
-    });
-    console.log(songs[0]);
+    }
+
+    let output: Song[] = knn(songs, userSong);
+
+    console.log(output);
+
+    res.send(output);
   }
 );
-
-async function test() {
-  let url: string =
-    "https://firebasestorage.googleapis.com/v0/b/road-trax.appspot.com/o/spotify.csv?alt=media&token=d2c11883-2495-46df-a719-d47dcbfaae80";
-
-  let response: AxiosResponse<String> = await axios.get(url);
-  let results = response.data
-    .split("\r\n")
-    .map((row: string) => row.split(","));
-
-  let songsRaw: string[][] = results.slice(1);
-  let features: string[] = results[0];
-
-  const songs: Song[] = [];
-  for (let i: number = 0; i < songsRaw.length; i++) {
-    let songData: string[] = songsRaw[i];
-    const song: Song = {
-      genre: songData[features.indexOf("genre")],
-      artist: songData[features.indexOf("artist_name")],
-      name: songData[features.indexOf("track_name")],
-      uid: songData[features.indexOf("track_id")],
-      popularity: parseFloat(songData[features.indexOf("popularity")]),
-      acousticness: parseFloat(songData[features.indexOf("acousticness")]),
-      danceability: parseFloat(songData[features.indexOf("danceability")]),
-      duration: parseFloat(songData[features.indexOf("duration_ms")]),
-      energy: parseFloat(songData[features.indexOf("energy")]),
-      instrumentalness: parseFloat(
-        songData[features.indexOf("instrumentalness")]
-      ),
-      key: songData[features.indexOf("key")],
-      liveness: parseFloat(songData[features.indexOf("liveness")]),
-      loudness: parseFloat(songData[features.indexOf("loudness")]),
-      mode: songData[features.indexOf("mode")],
-      speechiness: parseFloat(songData[features.indexOf("speechiness")]),
-      tempo: parseFloat(songData[features.indexOf("tempo")]),
-      timeStamp: songData[features.indexOf("time_signature")],
-      valence: parseFloat(songData[features.indexOf("valence")])
-    } as Song;
-    songs.push(song);
-  }
-
-  let dummy: Song = songs[3000];
-  let output: Song[] = knn(songs, dummy);
-
-  console.log(output);
-}
-
-test();
