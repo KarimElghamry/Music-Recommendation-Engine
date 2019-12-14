@@ -35,6 +35,6 @@ export function knn(songs: Song[], userSong: Song): Song[] {
     return a.distance - b.distance;
   });
 
-  let temp = distanceSongPairs.slice(0, 10).map((pair: Pair) => pair.song);
+  const temp: Song[] = distanceSongPairs.slice(0, 10).map((pair: Pair) => pair.song);
   return temp;
 }
