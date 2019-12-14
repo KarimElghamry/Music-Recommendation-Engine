@@ -6,7 +6,7 @@ import { Song } from "../src/models";
 import { knn } from "./knn";
 import * as path from "path";
 import * as os from "os";
-
+import { getAvgSong } from "./getAvgSong"
 admin.initializeApp();
 const db = admin.firestore();
 
@@ -15,44 +15,6 @@ export const getRecommendations = functions.https.onCall(
     const userId: string | undefined = context.auth?.uid;
     console.log(`user uid: ${context.auth?.uid}`);
     if (!userId) throw Error(`Invalid authentication`)
-
-    const userDoc: FirebaseFirestore.DocumentSnapshot = await db
-      .collection("users")
-      .doc(userId)
-      .get();
-
-    const userData: FirebaseFirestore.DocumentData | undefined = userDoc.data();
-    if (!userData) {
-      throw Error(`No data for user: ${userId}`);
-    }
-
-    const avgUserSong: any = userData.averageScore;
-
-    const userSong: Song = {
-      acousticness: avgUserSong.acousticness,
-      danceability: avgUserSong.danceability,
-      popularity: avgUserSong.popularity,
-      valence: avgUserSong.valence,
-      energy: avgUserSong.energy,
-      liveness: avgUserSong.liveness,
-      speechiness: avgUserSong.speechiness,
-      timeStamp: avgUserSong.timeStamp,
-      instrumentalness: avgUserSong.instrumentalness,
-      loudness: avgUserSong.loudness,
-      tempo: avgUserSong.tempo
-    };
-
-    console.log(`User avg: acousticness: ${userData.acousticness},
-    danceability: ${userData.danceability},
-    popularity: ${userData.popularity},
-    valence: ${userData.valence},
-    energy: ${userData.energy},
-    liveness: ${userData.liveness},
-    speechiness: ${userData.speechiness},
-    timeStamp: ${userData.timeStamp},
-    instrumentalness: ${userData.instrumentalness},
-    loudness: ${userData.loudness},
-    tempo: ${userData.tempo}`);
 
     const storage = admin.storage();
     const bucket = storage.bucket("gs://road-trax.appspot.com");
@@ -65,8 +27,22 @@ export const getRecommendations = functions.https.onCall(
     let results = Papa.parse(fs.readFileSync(tempFilePath, "utf8"));
     console.log(results.data.slice(1, 10));
 
-    let songsRaw = results.data.slice(1);
-    let features: String[] = results.data[0];
+    const songsRaw: String[][] = results.data.slice(1);
+    const features: String[] = results.data[0];
+
+
+    const userDoc: FirebaseFirestore.DocumentSnapshot = await db
+      .collection("users")
+      .doc(userId)
+      .get();
+
+    const userData: FirebaseFirestore.DocumentData | undefined = userDoc.data();
+    if (!userData) {
+      throw Error(`No data for user: ${userId}`);
+    }
+
+
+
 
     const songs: Song[] = [];
     for (let i: number = 0; i < songsRaw.length; i++) {
@@ -96,7 +72,18 @@ export const getRecommendations = functions.https.onCall(
       songs.push(song);
     }
 
-    const response: Song[] = knn(songs, userSong);
+
+    const listenHistory: any = userData.listenHistory;
+    for (let key in listenHistory) {
+      console.log(`HISTORY: ${key}:${listenHistory[key]}`)
+    }
+    const avgUserSong: Song = getAvgSong(listenHistory, songs);
+
+
+
+
+
+    const response: Song[] = knn(songs, avgUserSong);
 
     console.log(response);
 
