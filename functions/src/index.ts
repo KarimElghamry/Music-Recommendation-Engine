@@ -7,25 +7,27 @@ import { knn } from "./knn";
 import * as path from "path";
 import * as os from "os";
 import { getAvgSong } from "./getAvgSong"
+import { getSongsListenedTo } from "./getSongsListenedTo";
+import { naiveBayes } from "./naiveBayes";
 admin.initializeApp();
 const db = admin.firestore();
 
 export const getRecommendations = functions.https.onCall(
   async (data, context) => {
     const userId: string | undefined = context.auth?.uid;
-    console.log(`user uid: ${context.auth?.uid}`);
+    // console.log(`user uid: ${context.auth?.uid}`);
     if (!userId) throw Error(`Invalid authentication`)
 
     const storage = admin.storage();
-    const bucket = storage.bucket("gs://road-trax.appspot.com");
+    const bucket = storage.bucket("gs://road-trax-test.appspot.com");
     const tempFilePath = path.join(os.tmpdir(), "spotifyFeatures3.csv");
     await bucket
       .file("spotifyFeatures3.csv")
       .download({ destination: tempFilePath });
-    console.log("Downloaded to: " + tempFilePath);
+    // console.log("Downloaded to: " + tempFilePath);
 
     let results = Papa.parse(fs.readFileSync(tempFilePath, "utf8"));
-    console.log(results.data.slice(1, 10));
+    // console.log(results.data.slice(1, 10));
 
     const songsRaw: String[][] = results.data.slice(1);
     const features: String[] = results.data[0];
@@ -74,19 +76,33 @@ export const getRecommendations = functions.https.onCall(
 
 
     const listenHistory: any = userData.listenHistory;
-    for (let key in listenHistory) {
-      console.log(`HISTORY: ${key}:${listenHistory[key]}`)
-    }
-    const avgUserSong: Song = getAvgSong(listenHistory, songs);
+    // for (let key in listenHistory) {
+    //    console.log(`HISTORY: ${key}:${listenHistory[key]}`)
+    // }
+    const songsListenedTo: Song[] = getSongsListenedTo(listenHistory, songs);
+
+    const avgUserSong: Song = getAvgSong(songsListenedTo);
 
 
+    // console.log(`User avg: acousticness: ${avgUserSong.acousticness},
+    // danceability: ${avgUserSong.danceability},
+    // popularity: ${avgUserSong.popularity},
+    // valence: ${avgUserSong.valence},
+    // energy: ${avgUserSong.energy},
+    // liveness: ${avgUserSong.liveness},
+    // speechiness: ${avgUserSong.speechiness},
+    // timeStamp: ${avgUserSong.timeStamp},
+    // instrumentalness: ${avgUserSong.instrumentalness},
+    // loudness: ${avgUserSong.loudness},
+    // tempo: ${avgUserSong.tempo}`);
 
 
+    const knnResult: Song[] = knn(songs, avgUserSong);  //returns 20 sorted songs
+    // console.log(`KNN top Result: ${knnResult[0].artist} - ${knnResult[0].name}`);
+    // console.log(`KNN second Result: ${knnResult[1].artist} - ${knnResult[1].name}`);
+    // console.log(`KNN 7th Result: ${knnResult[6].artist} - ${knnResult[1].name}`);
 
-    const response: Song[] = knn(songs, avgUserSong);
-
-    console.log(response);
-
-    return Promise.resolve({ body: response });
+    const nbResult: Song[] = naiveBayes(songsListenedTo, knnResult) //returns 10 sorted songs
+    return Promise.resolve({ body: nbResult });
   }
 );
