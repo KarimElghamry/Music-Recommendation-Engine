@@ -1,7 +1,7 @@
 export interface Song {
   artist?: String;
   name?: String;
-  genre?: String;
+  genre: String | number;
   uid?: String;
   popularity: number;
   acousticness: number;
@@ -9,10 +9,10 @@ export interface Song {
   duration?: number;
   energy: number;
   instrumentalness: number;
-  key?: String;
+  key: String | number;
   liveness: number;
   loudness: number;
-  mode?: String;
+  mode: String | number;
   speechiness: number;
   tempo: number;
   timeStamp?: String;
