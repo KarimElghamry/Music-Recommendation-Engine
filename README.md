@@ -10,5 +10,5 @@
 
 <p align="justify">In this project, a recommendation engine is built from scratch by the aid of the Spotify dataset which includes thousands of song records with their respective features. In brief, the attributes for each song are initially normalized using feature scaling techniques, which is then used to feed the KNN and Naïve Bayes (cKN) classifiers to recommend the most suitable songs.</p>
 
-<p align="center"><img height="480px" src="images/C1.png"></p>
+<p align="center"><img height="200px" src="images/C1.PNG"></p>
 
